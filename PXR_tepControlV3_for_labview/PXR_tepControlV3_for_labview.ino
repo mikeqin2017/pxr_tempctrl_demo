@@ -24,6 +24,7 @@
  */
  #include <DueTimer.h>
 
+#define BUZZ 10
 unsigned char sensorValue = 0;
 unsigned char crcHigh;
 unsigned char crcLow;
@@ -32,7 +33,7 @@ float value,total_value;
 unsigned int n;
 
 float SV_upper=30;
-float SV_lower=28;
+float SV_lower=30;
 float SV_data,PV_data;
 
 unsigned int changeTime_low=200;
@@ -47,6 +48,7 @@ void tem_init(float tem);
 void readPXR_data(void);
 void readCmd(void);
 void handler2(void);
+void buzz(void);
 
 
 void setup() {
@@ -61,6 +63,9 @@ void setup() {
 
   Timer4.start();
   Timer4.attachInterrupt(handler2).setFrequency(10).start();
+
+  pinMode(BUZZ,OUTPUT);
+  digitalWrite(BUZZ,HIGH);
 }
 
 void loop() {
@@ -87,40 +92,41 @@ void loop() {
     tem_init(initData);
    }
 }
+
 void readCmd(){
-  unsigned char cmd,data;
-  cmd=Serial.read();
-  data=Serial.read();
-  switch(cmd)
+  unsigned char data[9];
+  unsigned char i;
+  for(i=0;i<9;i++)
   {
-    case 0x01:             //Set SV
-       initFlag=1;
-       initData=data;
-       break;
-    case 0x02:             //Set SV_upper
-       SV_upper=data;
-       break;
-    case 0x03:              //Set SV_lower
-       SV_lower=data;
-       break;
-    case 0x04:       //Set the time on upper temperature
-       changeTime_up=data;
-       break;
-    case 0x05:            //Set the time on lower temperature
-       changeTime_low=data;
-       break;    
-    case 0x06:  //mode 1
-       cirFlag=0;
-       break;  
-    case 0x07:  //mode 2 loop
-       cirFlag=1;
-       break;
-    case 0x55:
-      Serial.print(value);
+    if(Serial.available()>0){
+      data[i]=Serial.read();
+    }
+    else{
       break;
-     default:break;    
+    }
+  }
+  if(data[0]==0x01){
+    SV_upper=(data[1]<<8)|data[2];
+    SV_lower=(data[3]<<8)|data[4];
+    changeTime_up=(data[5]<<8)|data[6];
+    changeTime_low=(data[7]<<8)|data[8];
+    cirFlag=1;
+    initFlag=1;
+    initData=(data[1]<<8)|data[2];   
+  }
+  else if(data[0]==0x02){
+    cirFlag=0;
+    initFlag=1;
+    initData=(data[1]<<8)|data[2];
+  }
+  else if(data[0]==0x55){
+    Serial.print(value);
+  }
+  else{
+    
   }
 }
+
 void readPXR_data(){
     unsigned int Temp = 0;
     Temp =readRegister(0x02,0x04,0x0000,0x01);
@@ -225,6 +231,7 @@ unsigned char writeRegister(unsigned char id,unsigned char fun,unsigned int star
   }
   CRC16(PXR_GET_data,6);
   if((PXR_GET_data[6]==crcHigh)&&(PXR_GET_data[7]==crcLow)){
+    buzz();
     return 1;
   }
   }
@@ -274,3 +281,10 @@ unsigned int readRegister(unsigned char id,unsigned char fun,unsigned int startA
 void tem_init(float tem){
   writeRegister(0x02,0x06,0x0002,tem*20);
 }
+
+void buzz(){
+  digitalWrite(BUZZ,LOW);
+  delay(500);
+  digitalWrite(BUZZ,HIGH);
+}
+
