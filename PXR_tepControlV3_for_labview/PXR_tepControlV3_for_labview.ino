@@ -1,4 +1,4 @@
-/**
+ /**
  * @file arduino.ino
  *
  * @brief Arduino with PXR Temperature Controller sample code
@@ -65,6 +65,8 @@ void setup() {
   Timer4.attachInterrupt(handler2).setFrequency(10).start();
 
   pinMode(BUZZ,OUTPUT);
+  pinMode(9,OUTPUT);
+  digitalWrite(9,HIGH);
   digitalWrite(BUZZ,HIGH);
 }
 
@@ -106,18 +108,18 @@ void readCmd(){
     }
   }
   if(data[0]==0x01){
-    SV_upper=(data[1]<<8)|data[2];
-    SV_lower=(data[3]<<8)|data[4];
-    changeTime_up=(data[5]<<8)|data[6];
-    changeTime_low=(data[7]<<8)|data[8];
+    SV_upper=data[1];
+    SV_lower=data[2];;
+    changeTime_up=data[3];
+    changeTime_low=data[4];
     cirFlag=1;
     initFlag=1;
-    initData=(data[1]<<8)|data[2];   
+    initData=SV_upper;   
   }
   else if(data[0]==0x02){
     cirFlag=0;
     initFlag=1;
-    initData=(data[1]<<8)|data[2];
+    initData=data[1];
   }
   else if(data[0]==0x55){
     Serial.print(value);
@@ -129,10 +131,10 @@ void readCmd(){
 
 void readPXR_data(){
     unsigned int Temp = 0;
-    Temp =readRegister(0x02,0x04,0x0000,0x01);
+    Temp =readRegister(0x01,0x04,0x0000,0x01);
     PV_data=(float)(Temp)/100*5;
    // Serial.println(PV_data);
-    Temp =readRegister(0x02,0x04,0x0001,0x01);
+    Temp =readRegister(0x01,0x04,0x0001,0x01);
     SV_data=(float)(Temp)/100*5;
     //Serial.println(SV_data);
     if(cirFlag){
@@ -145,12 +147,12 @@ void readPXR_data(){
        waitFlag=1;
     }
     if(changeFlag==3){
-        while(!(writeRegister(0x02,0x06,0x0002,20*SV_lower)));
+        while(!(writeRegister(0x01,0x06,0x0002,20*SV_lower)));
         changeFlag=0;
         waitFlag=0;
     }
     if(changeFlag==4){
-      while(!(writeRegister(0x02,0x06,0x0002,20*SV_upper)));
+      while(!(writeRegister(0x01,0x06,0x0002,20*SV_upper)));
         changeFlag=0;
         waitFlag=0;
     }
@@ -159,11 +161,14 @@ void readPXR_data(){
 
 
 void handler2(){
+  static char n;
   if(Serial.available()>0){
       readCmd();
     }
+    if(++n>10)
+    {
     if(cirFlag){
-  if(changeFlag==1&&waitFlag==1){
+    if(changeFlag==1&&waitFlag==1){
     if(++completeTime>=changeTime_up*60){
         completeTime=0;
         changeFlag=3;
@@ -176,6 +181,8 @@ void handler2(){
     }
   }
      }
+     n=0;
+    }
 }
 
 void CRC16(unsigned char *ptr,unsigned int len){
@@ -279,7 +286,7 @@ unsigned int readRegister(unsigned char id,unsigned char fun,unsigned int startA
 } 
 
 void tem_init(float tem){
-  writeRegister(0x02,0x06,0x0002,tem*20);
+  writeRegister(0x01,0x06,0x0002,tem*20);
 }
 
 void buzz(){
